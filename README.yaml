@@ -1,70 +1,94 @@
-name: "template"
-
+name: "aws-eks-cert-manager"
 # Canonical GitHub repo
-github_repo: "cloudposse-terraform-components/template"
-
+github_repo: "cloudposse-terraform-components/aws-eks-cert-manager"
 # Short description of this project
 description: |-
-  Description of this component
+  This component creates a Helm release for [cert-manager](https://github.com/jetstack/cert-manager) on a Kubernetes
+  cluster. [cert-manager](https://github.com/jetstack/cert-manager) is a Kubernetes addon that provisions X.509
+  certificates.
 
-usage: |-
-  **Stack Level**: Regional or Test47
+  ## Usage
 
-  Here's an example snippet for how to use this component.
-  
+  **Stack Level**: Regional
+
+  Once the catalog file is created, the file can be imported as follows.
+
   ```yaml
-  components:
-    terraform:
-      foo:
-        vars:
-          enabled: true
+  import:
+    - catalog/eks/cert-manager
+    ...
   ```
 
+  The default catalog values `e.g. stacks/catalog/eks/cert-manager.yaml`
+
+  ```yaml
+  enabled: true
+  name: cert-manager
+  kubernetes_namespace: cert-manager
+  # `helm_manifest_experiment_enabled` does not work with cert-manager or any Helm chart that uses CRDs
+  helm_manifest_experiment_enabled: false
+  # Use the cert-manager as a private CA (Certificate Authority)
+  # to issue certificates for use within the Kubernetes cluster.
+  # Something like this is required for the ALB Ingress Controller.
+  cert_manager_issuer_selfsigned_enabled: true
+  # Use Let's Encrypt to issue certificates for use outside the Kubernetes cluster,
+  # ones that will be trusted by browsers.
+  # These do not (yet) work with the ALB Ingress Controller,
+  # which require ACM certificates, so we have no use for them.
+  letsencrypt_enabled: true
+  # cert_manager_issuer_support_email_template is only used if letsencrypt_enabled is true.
+  # If it were true, we would want to set it at the organization level.
+  cert_manager_issuer_support_email_template: "aws+%s@acme.com"
+  cert_manager_repository: https://charts.jetstack.io
+  cert_manager_chart: cert-manager
+  cert_manager_chart_version: v1.5.4
+
+  # use a local chart to provision Certificate Issuers
+  cert_manager_issuer_chart: ./cert-manager-issuer/
+  cert_manager_resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  ```
+
+  <!-- prettier-ignore-start -->
+
+  <!-- prettier-ignore-end -->
+
+  ## References
+
+  - [cert-manager](https://github.com/jetstack/cert-manager)
 include:
   - "docs/terraform.md"
-
 tags:
-  - terraform
-  - terraform-modules
-  - aws
-  - components
-  - terraform-components
-  - root
-  - geodesic
-  - reference-implementation
-  - reference-architecture
-
+  - component/eks/cert-manager
+  - layer/eks
+  - provider/aws
+  - provider/helm
 # Categories of this project
 categories:
-  - terraform-modules/root
-  - terraform-components
-
+  - component/eks/cert-manager
+  - layer/eks
+  - provider/aws
+  - provider/helm
 # License of this project
 license: "APACHE2"
-
 # Badges to display
 badges:
-  - name: "Latest Release"
-    image: "https://img.shields.io/github/release/cloudposse-terraform-components/template.svg?style=for-the-badge"
-    url: "https://github.com/cloudposse-terraform-components/template/releases/latest"
-  - name: "Slack Community"
-    image: "https://slack.cloudposse.com/for-the-badge.svg"
-    url: "https://slack.cloudposse.com"
-
-references:
-  - name: "Cloud Posse Documentation"
-    description: "Complete documentation for the Cloud Posse solution"
-    url: "https://docs.cloudposse.com"
-  - name: "Reference Architectures"
-    description: "Launch effortlessly with our turnkey reference architectures, built either by your team or ours."
-    url: "https://cloudposse.com/"
-
+  - name: Latest Release
+    image: https://img.shields.io/github/release/cloudposse-terraform-components/aws-eks-cert-manager.svg?style=for-the-badge
+    url: https://github.com/cloudposse-terraform-components/aws-eks-cert-manager/releases/latest
+  - name: Slack Community
+    image: https://slack.cloudposse.com/for-the-badge.svg
+    url: https://slack.cloudposse.com
 related:
-- name: "Cloud Posse Terraform Modules"
-  description: Our collection of reusable Terraform modules used by our reference architectures.
-  url: "https://docs.cloudposse.com/modules/"
-- name: "Atmos"
-  description: "Atmos is like docker-compose but for your infrastructure"
-  url: "https://atmos.tools"
-
+  - name: "Cloud Posse Terraform Modules"
+    description: Our collection of reusable Terraform modules used by our reference architectures.
+    url: "https://docs.cloudposse.com/modules/"
+  - name: "Atmos"
+    description: "Atmos is like docker-compose but for your infrastructure"
+    url: "https://atmos.tools"
 contributors: [] # If included generates contribs
