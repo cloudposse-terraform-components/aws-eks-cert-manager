@@ -2,6 +2,6 @@
 _extends: .github
 repository:
   name: aws-eks-cert-manager
-  description: This component creates a Helm release for [cert-manager](https://github
+  description: This component creates a Helm release for cert-manager on a Kubernetes cluster
   homepage: https://cloudposse.com/accelerate
   topics: terraform, terraform-component
