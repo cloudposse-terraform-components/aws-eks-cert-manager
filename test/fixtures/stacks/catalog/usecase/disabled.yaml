@@ -1,0 +1,39 @@
+components:
+  terraform:
+    eks/cert-manager/disabled:
+      metadata:
+        component: eks/cert-manager
+      vars:
+        enabled: false
+        name: cert-manager
+        kubernetes_namespace: default
+        dns_delegated_environment_name: ue2
+        kube_exec_auth_role_arn_enabled: false
+        # `helm_manifest_experiment_enabled` does not work with cert-manager or any Helm chart that uses CRDs
+        helm_manifest_experiment_enabled: false
+        # Use the cert-manager as a private CA (Certificate Authority)
+        # to issue certificates for use within the Kubernetes cluster.
+        # Something like this is required for the ALB Ingress Controller.
+        cert_manager_issuer_selfsigned_enabled: true
+        # Use Let's Encrypt to issue certificates for use outside the Kubernetes cluster,
+        # ones that will be trusted by browsers.
+        # These do not (yet) work with the ALB Ingress Controller,
+        # which require ACM certificates, so we have no use for them.
+        letsencrypt_enabled: true
+        # cert_manager_issuer_support_email_template is only used if letsencrypt_enabled is true.
+        # If it were true, we would want to set it at the organization level.
+        cert_manager_issuer_support_email_template: "aws+%s@acme.com"
+        cert_manager_repository: https://charts.jetstack.io
+        cert_manager_chart: cert-manager
+        cert_manager_chart_version: v1.5.4
+
+        # use a local chart to provision Certificate Issuers
+        cert_manager_issuer_chart: ./cert-manager-issuer/
+        cert_manager_resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
