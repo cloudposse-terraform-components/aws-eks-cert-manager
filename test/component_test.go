@@ -19,7 +19,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"k8s.io/client-go/dynamic"
-
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/tools/cache"
 )
 
 type ComponentSuite struct {
@@ -126,42 +127,54 @@ func (s *ComponentSuite) TestBasic() {
 		Resource: "certificates",
 	}
 
+	defer func() {
+		err := dynamicClient.Resource(certGVR).Namespace(namespace).Delete(context.Background(), certName, metav1.DeleteOptions{})
+		assert.NoError(s.T(), err)
+	}()
+
 	_, err = dynamicClient.Resource(certGVR).Namespace(namespace).Create(context.Background(), certificate, metav1.CreateOptions{})
 	assert.NoError(s.T(), err)
 
-	time.Sleep(2 * time.Minute) // Wait for the certificate to be ready
+	factory := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 0)
+	informer := factory.ForResource(certGVR).Informer()
 
-	certificateName := certName
-	certificateGVR := schema.GroupVersionResource{
-		Group:    "cert-manager.io",
-		Version:  "v1",
-		Resource: "certificates",
-	}
+	stopChannel := make(chan struct{})
 
-	// Wait for the Certificate status to be ready
-	for {
-		cert, err := dynamicClient.Resource(certificateGVR).Namespace(namespace).Get(context.Background(), certificateName, metav1.GetOptions{})
-		assert.NoError(s.T(), err)
+	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			cert := newObj.(*unstructured.Unstructured)
 
-		conditions, found, err := unstructured.NestedSlice(cert.Object, "status", "conditions")
-		assert.NoError(s.T(), err, "error retrieving conditions from status")
-		assert.True(s.T(), found, "conditions field not found in status")
-
-		// Check if the certificate is ready
-		isReady := false
-		for _, condition := range conditions {
-			conditionMap := condition.(map[string]interface{})
-			if conditionMap["type"] == "Ready" && conditionMap["status"] == "True" {
-				isReady = true
-				break
+			if cert.GetName() != certName {
+				fmt.Printf("Certificate name is not 'test', it is '%s'\n", cert.GetName())
+				return
 			}
-		}
+			conditions, found, err := unstructured.NestedSlice(cert.Object, "status", "conditions")
 
-		if isReady {
-			break
-		}
+			if err != nil || !found {
+				fmt.Println("Error retrieving conditions from status")
+				return
+			}
 
-		time.Sleep(10 * time.Second) // Wait before checking again
+			// Check if the certificate is ready
+			for _, condition := range conditions {
+				conditionMap := condition.(map[string]interface{})
+				if conditionMap["type"] == "Ready" && conditionMap["status"] == "True" {
+					close(stopChannel) // Stop the informer if the certificate is ready
+					return
+				}
+			}
+		},
+	})
+
+	go informer.Run(stopChannel)
+
+	select {
+		case <-stopChannel:
+			msg := "Certificate is ready"
+			fmt.Println(msg)
+		case <-time.After(5 * time.Minute):
+			msg := "Certificate is not ready"
+			assert.Fail(s.T(), msg)
 	}
 
 	s.DriftTest(component, stack, &inputs)
