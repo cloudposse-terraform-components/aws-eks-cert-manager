@@ -11,6 +11,7 @@ tags:
 This component creates a Helm release for [cert-manager](https://github.com/jetstack/cert-manager) on a Kubernetes
 cluster. [cert-manager](https://github.com/jetstack/cert-manager) is a Kubernetes addon that provisions X.509
 certificates.
+
 ## Usage
 
 **Stack Level**: Regional
@@ -59,10 +60,7 @@ cert_manager_resources:
 ```
 
 <!-- prettier-ignore-start -->
-<!-- prettier-ignore-end -->
-
-
-<!-- markdownlint-disable -->
+<!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
 ## Requirements
 
 | Name | Version |
@@ -162,17 +160,11 @@ cert_manager_resources:
 |------|-------------|
 | <a name="output_cert_manager_issuer_metadata"></a> [cert\_manager\_issuer\_metadata](#output\_cert\_manager\_issuer\_metadata) | Block status of the deployed release |
 | <a name="output_cert_manager_metadata"></a> [cert\_manager\_metadata](#output\_cert\_manager\_metadata) | Block status of the deployed release |
-<!-- markdownlint-restore -->
-
-
+<!-- END OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
+<!-- prettier-ignore-end -->
 
 ## References
 
-
-- [cert-manager](https://github.com/jetstack/cert-manager) - 
-
-
-
+- [cert-manager](https://github.com/jetstack/cert-manager)
 
 [<img src="https://cloudposse.com/logo-300x69.svg" height="32" align="right"/>](https://cpco.io/homepage?utm_source=github&utm_medium=readme&utm_campaign=cloudposse-terraform-components/aws-eks-cert-manager&utm_content=)
-
