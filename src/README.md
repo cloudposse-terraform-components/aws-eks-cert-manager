@@ -71,7 +71,7 @@ cert_manager_resources:
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.9.0, < 6.0.0 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 2.0.0, < 3.0.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 2.14.0, != 2.21.0 |
-| <a name="requirement_utils"></a> [utils](#requirement\_utils) | >= 1.7.1, != 1.4.0, < 1.32.0 |
+| <a name="requirement_utils"></a> [utils](#requirement\_utils) | >= 2.0.0, < 3.0.0 |
 
 ## Providers
 
@@ -85,8 +85,8 @@ cert_manager_resources:
 |------|--------|---------|
 | <a name="module_cert_manager"></a> [cert\_manager](#module\_cert\_manager) | cloudposse/helm-release/aws | 0.10.1 |
 | <a name="module_cert_manager_issuer"></a> [cert\_manager\_issuer](#module\_cert\_manager\_issuer) | cloudposse/helm-release/aws | 0.10.1 |
-| <a name="module_dns_gbl_delegated"></a> [dns\_gbl\_delegated](#module\_dns\_gbl\_delegated) | cloudposse/stack-config/yaml//modules/remote-state | 1.8.0 |
-| <a name="module_eks"></a> [eks](#module\_eks) | cloudposse/stack-config/yaml//modules/remote-state | 1.8.0 |
+| <a name="module_dns_gbl_delegated"></a> [dns\_gbl\_delegated](#module\_dns\_gbl\_delegated) | cloudposse/stack-config/yaml//modules/remote-state | 2.0.0 |
+| <a name="module_eks"></a> [eks](#module\_eks) | cloudposse/stack-config/yaml//modules/remote-state | 2.0.0 |
 | <a name="module_iam_roles"></a> [iam\_roles](#module\_iam\_roles) | ../../account-map/modules/iam-roles | n/a |
 | <a name="module_this"></a> [this](#module\_this) | cloudposse/label/null | 0.25.0 |
 
