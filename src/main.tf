@@ -86,8 +86,8 @@ module "cert_manager" {
     # cert-manager-specific values
     var.letsencrypt_enabled ? yamlencode({
       ingressShim = {
-        defaultIssuerName                = "ClusterIssuer"
-        ingress_shim_default_issuer_name = "letsencrypt-staging"
+        defaultIssuerName = "letsencrypt-staging"
+        defaultIssuerKind = "ClusterIssuer"
       },
     }) : "",
     var.cert_manager_metrics_enabled ? yamlencode({
