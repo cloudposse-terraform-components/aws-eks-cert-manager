@@ -220,42 +220,38 @@ func verifyClusterIssuerStatus(t *testing.T, dynamicClient dynamic.Interface, is
 
 	// The controller populates .status.conditions asynchronously after the
 	// ClusterIssuer is created (ACME issuers only become Ready after account
-	// registration), so poll instead of asserting on a single immediate read.
+	// registration), so poll for the Ready condition instead of asserting on
+	// a single immediate read. The deadline context bounds both the polling
+	// loop and each individual Kubernetes request.
 	const pollInterval = 5 * time.Second
 	const pollTimeout = 2 * time.Minute
 
-	var clusterIssuer *unstructured.Unstructured
-	var conditions []interface{}
-	var found bool
-	var err error
+	ctx, cancel := context.WithTimeout(context.Background(), pollTimeout)
+	defer cancel()
 
-	for start := time.Now(); time.Since(start) < pollTimeout; time.Sleep(pollInterval) {
-		clusterIssuer, err = dynamicClient.Resource(clusterIssuerGVR).Get(context.Background(), issuerName, metav1.GetOptions{})
-		if err != nil || clusterIssuer == nil {
-			continue
+	for {
+		clusterIssuer, err := dynamicClient.Resource(clusterIssuerGVR).Get(ctx, issuerName, metav1.GetOptions{})
+		if err == nil && clusterIssuer != nil {
+			conditions, found, nestedErr := unstructured.NestedSlice(clusterIssuer.Object, "status", "conditions")
+			if nestedErr == nil && found {
+				// Same readiness pattern as the Certificate check in TestBasic.
+				for _, condition := range conditions {
+					conditionMap, ok := condition.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					if conditionMap["type"] == "Ready" && conditionMap["status"] == "True" {
+						return
+					}
+				}
+			}
 		}
-		conditions, found, err = unstructured.NestedSlice(clusterIssuer.Object, "status", "conditions")
-		if err == nil && found && len(conditions) > 0 {
-			break
+
+		select {
+		case <-ctx.Done():
+			assert.Fail(t, fmt.Sprintf("ClusterIssuer %q did not report a Ready=True condition within %s (last Get error: %v)", issuerName, pollTimeout, err))
+			return
+		case <-time.After(pollInterval):
 		}
 	}
-
-	assert.NoError(t, err, "error retrieving ClusterIssuer or its status conditions")
-	assert.NotNil(t, clusterIssuer)
-	assert.True(t, found, "conditions field not found in status")
-	if !assert.NotEmpty(t, conditions, "conditions slice is empty") {
-		return
-	}
-
-	// Extract the first condition from the slice.
-	firstCondition, ok := conditions[0].(map[string]interface{})
-	assert.True(t, ok, "first condition is not a map[string]interface{}")
-
-	// Use the unstructured helper to retrieve the 'status' field from the condition.
-	conditionStatus, found, err := unstructured.NestedString(firstCondition, "status")
-	assert.NoError(t, err, "error retrieving status from first condition")
-	assert.True(t, found, "status field not found in first condition")
-
-	// Assert that the condition status is "True".
-	assert.Equal(t, "True", conditionStatus)
 }
