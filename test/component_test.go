@@ -218,15 +218,34 @@ func verifyClusterIssuerStatus(t *testing.T, dynamicClient dynamic.Interface, is
 		Resource: "clusterissuers",
 	}
 
-	// Create the DNSEndpoint resource in the "default" namespace
-	letsencryptProd, err := dynamicClient.Resource(clusterIssuerGVR).Get(context.Background(), issuerName, metav1.GetOptions{})
-	assert.NoError(t, err)
-	assert.NotNil(t, letsencryptProd)
+	// The controller populates .status.conditions asynchronously after the
+	// ClusterIssuer is created (ACME issuers only become Ready after account
+	// registration), so poll instead of asserting on a single immediate read.
+	const pollInterval = 5 * time.Second
+	const pollTimeout = 2 * time.Minute
 
-	conditions, found, err := unstructured.NestedSlice(letsencryptProd.Object, "status", "conditions")
-	assert.NoError(t, err, "error retrieving conditions from status")
+	var clusterIssuer *unstructured.Unstructured
+	var conditions []interface{}
+	var found bool
+	var err error
+
+	for start := time.Now(); time.Since(start) < pollTimeout; time.Sleep(pollInterval) {
+		clusterIssuer, err = dynamicClient.Resource(clusterIssuerGVR).Get(context.Background(), issuerName, metav1.GetOptions{})
+		if err != nil || clusterIssuer == nil {
+			continue
+		}
+		conditions, found, err = unstructured.NestedSlice(clusterIssuer.Object, "status", "conditions")
+		if err == nil && found && len(conditions) > 0 {
+			break
+		}
+	}
+
+	assert.NoError(t, err, "error retrieving ClusterIssuer or its status conditions")
+	assert.NotNil(t, clusterIssuer)
 	assert.True(t, found, "conditions field not found in status")
-	assert.NotEmpty(t, conditions, "conditions slice is empty")
+	if !assert.NotEmpty(t, conditions, "conditions slice is empty") {
+		return
+	}
 
 	// Extract the first condition from the slice.
 	firstCondition, ok := conditions[0].(map[string]interface{})
