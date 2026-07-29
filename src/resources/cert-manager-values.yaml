@@ -1,5 +1,6 @@
-rbac:
-  create: true
+global:
+  rbac:
+    create: true
 installCRDs: true
 serviceAccount:
   create: true
@@ -11,7 +12,5 @@ prometheus:
     prometheusInstance: default
     interval: 60s
     scrapeTimeout: 30s
-webhook:
-  enabled: true
 cainjector:
   enabled: true

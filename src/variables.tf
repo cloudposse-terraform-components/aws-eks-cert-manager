@@ -61,9 +61,9 @@ variable "cert_manager_resources" {
   }
 }
 
-variable "cart_manager_rbac_enabled" {
+variable "cert_manager_rbac_enabled" {
   type        = bool
-  description = "Service Account for pods."
+  description = "Whether or not to create RBAC resources (Roles, ClusterRoles, and their bindings) for cert-manager."
   default     = true
 }
 

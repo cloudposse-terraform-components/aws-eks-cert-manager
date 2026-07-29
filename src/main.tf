@@ -79,8 +79,10 @@ module "cert_manager" {
         name = module.this.name
       },
       resources = var.cert_manager_resources
-      rbac = {
-        create = var.cart_manager_rbac_enabled
+      global = {
+        rbac = {
+          create = var.cert_manager_rbac_enabled
+        }
       }
     }),
     # cert-manager-specific values
