@@ -1,16 +1,15 @@
 global:
   rbac:
     create: true
-installCRDs: true
+# Requires chart >= v1.15. If you pin an older chart via `cert_manager_chart_version`,
+# override with `installCRDs: true` via `cert_manager_values` instead.
+crds:
+  enabled: true
+  keep: true
 serviceAccount:
   create: true
 securityContext:
   fsGroup: 1001
   runAsUser: 1001
-prometheus:
-  servicemonitor:
-    prometheusInstance: default
-    interval: 60s
-    scrapeTimeout: 30s
 cainjector:
   enabled: true

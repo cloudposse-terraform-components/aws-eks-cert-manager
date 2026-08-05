@@ -84,7 +84,7 @@ letsencrypt_enabled: true
 cert_manager_issuer_support_email_template: "aws+%s@acme.com"
 cert_manager_repository: https://charts.jetstack.io
 cert_manager_chart: cert-manager
-cert_manager_chart_version: v1.5.4
+cert_manager_chart_version: v1.21.1
 
 # use a local chart to provision Certificate Issuers
 cert_manager_issuer_chart: ./cert-manager-issuer/
@@ -96,6 +96,46 @@ cert_manager_resources:
     cpu: 100m
     memory: 128Mi
 ```
+
+If you are upgrading an existing release from an older cert-manager version, review
+[docs/upgrading-to-v1.21.md](docs/upgrading-to-v1.21.md) for breaking changes and
+required pre-flight checks.
+
+### Optional: cluster-default issuer for ingress-shim
+
+To make an issuer the cluster-wide default for Ingress resources that request
+certificates without naming an issuer, set:
+
+```yaml
+ingress_shim_default_issuer_name: letsencrypt-prod
+```
+
+If unset (the default), no default issuer is configured and every Ingress must name
+its issuer explicitly (e.g. via the `cert-manager.io/cluster-issuer` annotation).
+
+### Troubleshooting: ServiceAccount missing the IRSA annotation
+
+When `letsencrypt_enabled: true`, the component creates an IAM role for Route53 DNS-01
+challenges and annotates the cert-manager ServiceAccount with it
+(`eks.amazonaws.com/role-arn`) via the Helm release. Verify with:
+
+```shell
+kubectl get serviceaccount cert-manager -n cert-manager -o jsonpath='{.metadata.annotations}'
+```
+
+and compare against the component's `service_account_role_arn` output. If the annotation
+is missing, set it explicitly and disable the built-in injection:
+
+```yaml
+service_account_role_arn_annotation_enabled: false
+cert_manager_values:
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: "<value of the service_account_role_arn output>"
+```
+
+The controller reads the annotation only at pod startup, so restart the cert-manager
+Deployment after the annotation first lands.
 
 <!-- prettier-ignore-start -->
 <!-- prettier-ignore-end -->

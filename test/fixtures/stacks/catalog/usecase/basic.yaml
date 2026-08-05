@@ -20,12 +20,14 @@ components:
         # These do not (yet) work with the ALB Ingress Controller,
         # which require ACM certificates, so we have no use for them.
         letsencrypt_enabled: true
+        # Exercise the opt-in ingress-shim default issuer values path
+        ingress_shim_default_issuer_name: letsencrypt-staging
         # cert_manager_issuer_support_email_template is only used if letsencrypt_enabled is true.
         # If it were true, we would want to set it at the organization level.
         cert_manager_issuer_support_email_template: "aws+%s@acme.com"
         cert_manager_repository: https://charts.jetstack.io
         cert_manager_chart: cert-manager
-        cert_manager_chart_version: v1.5.4
+        cert_manager_chart_version: v1.21.1
 
         # use a local chart to provision Certificate Issuers
         cert_manager_issuer_chart: ./cert-manager-issuer/

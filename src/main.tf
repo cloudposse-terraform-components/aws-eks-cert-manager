@@ -31,7 +31,7 @@ module "cert_manager" {
 
   service_account_name                        = module.this.name
   service_account_namespace                   = var.kubernetes_namespace
-  service_account_role_arn_annotation_enabled = var.letsencrypt_enabled
+  service_account_role_arn_annotation_enabled = coalesce(var.service_account_role_arn_annotation_enabled, var.letsencrypt_enabled)
 
   iam_policy_statements = {
     GrantGetChange = {
@@ -86,9 +86,9 @@ module "cert_manager" {
       }
     }),
     # cert-manager-specific values
-    var.letsencrypt_enabled ? yamlencode({
+    var.ingress_shim_default_issuer_name != null ? yamlencode({
       ingressShim = {
-        defaultIssuerName = "letsencrypt-staging"
+        defaultIssuerName = var.ingress_shim_default_issuer_name
         defaultIssuerKind = "ClusterIssuer"
       },
     }) : "",

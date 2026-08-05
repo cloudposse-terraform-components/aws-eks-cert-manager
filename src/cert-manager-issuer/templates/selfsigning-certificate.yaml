@@ -13,6 +13,9 @@ spec:
   privateKey:
     algorithm: ECDSA
     size: 256
+    # Set explicitly so key-rotation behavior is deliberate rather than inherited
+    # from the cert-manager version's default (which changed to Always in v1.18).
+    rotationPolicy: {{ .Values.selfsigned_ca_rotation_policy }}
   issuerRef:
     name: selfsigning-issuer
     kind: ClusterIssuer
