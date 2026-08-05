@@ -1,6 +1,3 @@
-global:
-  rbac:
-    create: true
 # Requires chart >= v1.15. If you pin an older chart via `cert_manager_chart_version`,
 # override with `installCRDs: true` via `cert_manager_values` instead.
 crds:
