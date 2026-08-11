@@ -57,7 +57,7 @@ func (s *ComponentSuite) TestBasic() {
 
 	atmos.OutputStruct(s.T(), options, "cert_manager_metadata", &metadataCertManager)
 
-	assert.Equal(s.T(), metadataCertManager.AppVersion, "v1.5.4")
+	assert.Equal(s.T(), metadataCertManager.AppVersion, "v1.21.1")
 	assert.Equal(s.T(), metadataCertManager.Chart, "cert-manager")
 	assert.NotNil(s.T(), metadataCertManager.FirstDeployed)
 	assert.NotNil(s.T(), metadataCertManager.LastDeployed)
@@ -66,7 +66,7 @@ func (s *ComponentSuite) TestBasic() {
 	assert.NotEmpty(s.T(), metadataCertManager.Notes)
 	assert.Equal(s.T(), metadataCertManager.Revision, 1)
 	assert.NotNil(s.T(), metadataCertManager.Values)
-	assert.Equal(s.T(), metadataCertManager.Version, "v1.5.4")
+	assert.Equal(s.T(), metadataCertManager.Version, "v1.21.1")
 
 
 	metadataCertManagerIssuer := helm.Metadata{}
@@ -177,6 +177,10 @@ func (s *ComponentSuite) TestBasic() {
 			assert.Fail(s.T(), msg)
 	}
 
+	// The basic fixture sets `ingress_shim_default_issuer_name: letsencrypt-staging`,
+	// so an annotated Ingress that names no issuer must resolve to that default.
+	verifyIngressShimDefaultIssuer(s.T(), dynamicClient, namespace, fmt.Sprintf("ingress-%s", randomID), fmt.Sprintf("shim.%s", domainName), "letsencrypt-staging")
+
 	s.DriftTest(component, stack, &inputs)
 }
 
@@ -210,6 +214,106 @@ func TestRunSuite(t *testing.T) {
 	helper.Run(t, suite)
 }
 
+
+// verifyIngressShimDefaultIssuer creates an Ingress annotated for TLS but without a
+// `cert-manager.io/cluster-issuer` annotation, and asserts that the Certificate
+// ingress-shim generates for it points at the chart's configured default issuer.
+func verifyIngressShimDefaultIssuer(t *testing.T, dynamicClient dynamic.Interface, namespace string, ingressName string, host string, issuerName string) {
+	ingressGVR := schema.GroupVersionResource{
+		Group:    "networking.k8s.io",
+		Version:  "v1",
+		Resource: "ingresses",
+	}
+	certGVR := schema.GroupVersionResource{
+		Group:    "cert-manager.io",
+		Version:  "v1",
+		Resource: "certificates",
+	}
+
+	// ingress-shim names the generated Certificate after the TLS secret.
+	certName := ingressName
+
+	ingress := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "networking.k8s.io/v1",
+			"kind":       "Ingress",
+			"metadata": map[string]interface{}{
+				"name":      ingressName,
+				"namespace": namespace,
+				"annotations": map[string]interface{}{
+					"kubernetes.io/tls-acme": "true",
+				},
+			},
+			"spec": map[string]interface{}{
+				"tls": []interface{}{
+					map[string]interface{}{
+						"hosts":      []interface{}{host},
+						"secretName": certName,
+					},
+				},
+				"rules": []interface{}{
+					map[string]interface{}{
+						"host": host,
+						"http": map[string]interface{}{
+							"paths": []interface{}{
+								map[string]interface{}{
+									"path":     "/",
+									"pathType": "Prefix",
+									"backend": map[string]interface{}{
+										"service": map[string]interface{}{
+											"name": "placeholder",
+											"port": map[string]interface{}{
+												"number": int64(80),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Deleting the Ingress garbage-collects the Certificate it owns.
+	defer func() {
+		err := dynamicClient.Resource(ingressGVR).Namespace(namespace).Delete(context.Background(), ingressName, metav1.DeleteOptions{})
+		assert.NoError(t, err)
+	}()
+
+	_, err := dynamicClient.Resource(ingressGVR).Namespace(namespace).Create(context.Background(), ingress, metav1.CreateOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// ingress-shim reconciles the Ingress asynchronously, so poll for the Certificate.
+	const pollInterval = 5 * time.Second
+	const pollTimeout = 2 * time.Minute
+
+	ctx, cancel := context.WithTimeout(context.Background(), pollTimeout)
+	defer cancel()
+
+	for {
+		cert, getErr := dynamicClient.Resource(certGVR).Namespace(namespace).Get(ctx, certName, metav1.GetOptions{})
+		if getErr == nil && cert != nil {
+			name, found, nestedErr := unstructured.NestedString(cert.Object, "spec", "issuerRef", "name")
+			if nestedErr == nil && found {
+				assert.Equal(t, issuerName, name)
+				kind, _, _ := unstructured.NestedString(cert.Object, "spec", "issuerRef", "kind")
+				assert.Equal(t, "ClusterIssuer", kind)
+				return
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			assert.Fail(t, fmt.Sprintf("ingress-shim did not generate Certificate %q with a default issuerRef within %s (last Get error: %v)", certName, pollTimeout, getErr))
+			return
+		case <-time.After(pollInterval):
+		}
+	}
+}
 
 func verifyClusterIssuerStatus(t *testing.T, dynamicClient dynamic.Interface, issuerName string) {
 	clusterIssuerGVR := schema.GroupVersionResource{
