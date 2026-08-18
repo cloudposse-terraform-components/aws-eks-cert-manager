@@ -20,8 +20,11 @@ components:
         # These do not (yet) work with the ALB Ingress Controller,
         # which require ACM certificates, so we have no use for them.
         letsencrypt_enabled: true
-        # Exercise the opt-in ingress-shim default issuer values path
-        ingress_shim_default_issuer_name: letsencrypt-staging
+        # Exercise the opt-in ingress-shim default issuer values path. Deliberately the
+        # self-signed ClusterIssuer and not an ACME one: certificates the shim generates for
+        # the test Ingress are issued instantly and leave no ACME Order or Challenge behind to
+        # block the namespace from terminating during destroy.
+        ingress_shim_default_issuer_name: selfsigning-issuer
         # cert_manager_issuer_support_email_template is only used if letsencrypt_enabled is true.
         # If it were true, we would want to set it at the organization level.
         cert_manager_issuer_support_email_template: "aws+%s@acme.com"
