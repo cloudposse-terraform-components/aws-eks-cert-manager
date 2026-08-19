@@ -59,7 +59,7 @@ cert_manager_resources:
 ```
 
 If you are upgrading an existing release from an older cert-manager version, review
-[docs/upgrading-to-v1.21.md](../docs/upgrading-to-v1.21.md) for breaking changes and
+[docs/upgrading-to-v1.21.md](docs/upgrading-to-v1.21.md) for breaking changes and
 required pre-flight checks.
 
 ### Optional: cluster-default issuer for ingress-shim
@@ -106,7 +106,7 @@ Deployment after the annotation first lands.
 ## Requirements
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.9.0, < 6.0.0 |
 | <a name="requirement_helm"></a> [helm](#requirement\_helm) | >= 2.0.0, < 3.0.0 |
@@ -116,13 +116,13 @@ Deployment after the annotation first lands.
 ## Providers
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.9.0, < 6.0.0 |
 
 ## Modules
 
 | Name | Source | Version |
-|------|--------|---------|
+| ---- | ------ | ------- |
 | <a name="module_cert_manager"></a> [cert\_manager](#module\_cert\_manager) | cloudposse/helm-release/aws | 0.10.1 |
 | <a name="module_cert_manager_issuer"></a> [cert\_manager\_issuer](#module\_cert\_manager\_issuer) | cloudposse/helm-release/aws | 0.10.1 |
 | <a name="module_dns_gbl_delegated"></a> [dns\_gbl\_delegated](#module\_dns\_gbl\_delegated) | cloudposse/stack-config/yaml//modules/remote-state | 2.0.0 |
@@ -133,14 +133,14 @@ Deployment after the annotation first lands.
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [aws_eks_cluster_auth.eks](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/eks_cluster_auth) | data source |
 | [aws_partition.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/partition) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_account_map_enabled"></a> [account\_map\_enabled](#input\_account\_map\_enabled) | Enable the account map component lookup. When disabled, use the `eks` variable to provide static EKS cluster configuration. | `bool` | `true` | no |
 | <a name="input_additional_tag_map"></a> [additional\_tag\_map](#input\_additional\_tag\_map) | Additional key-value pairs to add to each map in `tags_as_list_of_maps`. Not added to `tags` or `id`.<br/>This is for some rare cases where resources want additional configuration of tags<br/>and therefore take a list of maps with tag key, value, and additional configuration. | `map(string)` | `{}` | no |
 | <a name="input_atomic"></a> [atomic](#input\_atomic) | If `true`, if any part of the installation process fails, all parts are treated as failed. Highly recommended to prevent cert-manager from getting into a wedged state. The wait flag will be set automatically if atomic is used. | `bool` | `true` | no |
@@ -165,6 +165,7 @@ Deployment after the annotation first lands.
 | <a name="input_create_namespace"></a> [create\_namespace](#input\_create\_namespace) | Create the namespace if it does not yet exist. Defaults to `true`. | `bool` | `true` | no |
 | <a name="input_delimiter"></a> [delimiter](#input\_delimiter) | Delimiter to be used between ID elements.<br/>Defaults to `-` (hyphen). Set to `""` to use no delimiter at all. | `string` | `null` | no |
 | <a name="input_descriptor_formats"></a> [descriptor\_formats](#input\_descriptor\_formats) | Describe additional descriptors to be output in the `descriptors` output map.<br/>Map of maps. Keys are names of descriptors. Values are maps of the form<br/>`{<br/>  format = string<br/>  labels = list(string)<br/>}`<br/>(Type is `any` so the map values can later be enhanced to provide additional options.)<br/>`format` is a Terraform format string to be passed to the `format()` function.<br/>`labels` is a list of labels, in order, to pass to `format()` function.<br/>Label values will be normalized before being passed to `format()` so they will be<br/>identical to how they appear in `id`.<br/>Default is `{}` (`descriptors` output will be empty). | `any` | `{}` | no |
+| <a name="input_dns_gbl_delegated_component_name"></a> [dns\_gbl\_delegated\_component\_name](#input\_dns\_gbl\_delegated\_component\_name) | The name of the component where global `dns_delegated` is provisioned | `string` | `"dns-delegated"` | no |
 | <a name="input_dns_gbl_delegated_environment_name"></a> [dns\_gbl\_delegated\_environment\_name](#input\_dns\_gbl\_delegated\_environment\_name) | The name of the environment where global `dns_delegated` is provisioned | `string` | `"gbl"` | no |
 | <a name="input_eks"></a> [eks](#input\_eks) | EKS cluster outputs. When set, bypasses remote-state lookup of eks/cluster. | <pre>object({<br/>    eks_cluster_id                         = optional(string, null)<br/>    eks_cluster_arn                        = optional(string, null)<br/>    eks_cluster_endpoint                   = optional(string, null)<br/>    eks_cluster_certificate_authority_data = optional(string, null)<br/>    eks_cluster_identity_oidc_issuer       = optional(string, null)<br/>    karpenter_iam_role_arn                 = optional(string, null)<br/>  })</pre> | `null` | no |
 | <a name="input_eks_component_name"></a> [eks\_component\_name](#input\_eks\_component\_name) | The name of the eks component | `string` | `"eks/cluster"` | no |
@@ -172,6 +173,7 @@ Deployment after the annotation first lands.
 | <a name="input_environment"></a> [environment](#input\_environment) | ID element. Usually used for region e.g. 'uw2', 'us-west-2', OR role 'prod', 'staging', 'dev', 'UAT' | `string` | `null` | no |
 | <a name="input_helm_manifest_experiment_enabled"></a> [helm\_manifest\_experiment\_enabled](#input\_helm\_manifest\_experiment\_enabled) | Enable storing of the rendered manifest for helm\_release so the full diff of what is changing can been seen in the plan | `bool` | `false` | no |
 | <a name="input_id_length_limit"></a> [id\_length\_limit](#input\_id\_length\_limit) | Limit `id` to this many characters (minimum 6).<br/>Set to `0` for unlimited length.<br/>Set to `null` for keep the existing setting, which defaults to `0`.<br/>Does not affect `id_full`. | `number` | `null` | no |
+| <a name="input_ingress_shim_default_issuer_name"></a> [ingress\_shim\_default\_issuer\_name](#input\_ingress\_shim\_default\_issuer\_name) | Name of a ClusterIssuer (e.g. `letsencrypt-prod`) for ingress-shim to use as the cluster-wide default<br/>when an annotated Ingress requests a certificate without naming an issuer. If `null` (the default),<br/>no default issuer is configured and every Ingress must specify its issuer explicitly. | `string` | `null` | no |
 | <a name="input_kube_data_auth_enabled"></a> [kube\_data\_auth\_enabled](#input\_kube\_data\_auth\_enabled) | If `true`, use an `aws_eks_cluster_auth` data source to authenticate to the EKS cluster.<br/>Disabled by `kubeconfig_file_enabled` or `kube_exec_auth_enabled`. | `bool` | `false` | no |
 | <a name="input_kube_exec_auth_aws_profile"></a> [kube\_exec\_auth\_aws\_profile](#input\_kube\_exec\_auth\_aws\_profile) | The AWS config profile for `aws eks get-token` to use | `string` | `""` | no |
 | <a name="input_kube_exec_auth_aws_profile_enabled"></a> [kube\_exec\_auth\_aws\_profile\_enabled](#input\_kube\_exec\_auth\_aws\_profile\_enabled) | If `true`, pass `kube_exec_auth_aws_profile` as the `profile` to `aws eks get-token` | `bool` | `false` | no |
@@ -193,6 +195,7 @@ Deployment after the annotation first lands.
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | ID element. Usually an abbreviation of your organization name, e.g. 'eg' or 'cp', to help ensure generated IDs are globally unique | `string` | `null` | no |
 | <a name="input_regex_replace_chars"></a> [regex\_replace\_chars](#input\_regex\_replace\_chars) | Terraform regular expression (regex) string.<br/>Characters matching the regex will be removed from the ID elements.<br/>If not set, `"/[^a-zA-Z0-9-]/"` is used to remove all characters other than hyphens, letters and digits. | `string` | `null` | no |
 | <a name="input_region"></a> [region](#input\_region) | AWS Region | `string` | n/a | yes |
+| <a name="input_service_account_role_arn_annotation_enabled"></a> [service\_account\_role\_arn\_annotation\_enabled](#input\_service\_account\_role\_arn\_annotation\_enabled) | Whether the Helm release should annotate the cert-manager ServiceAccount with the IRSA IAM role ARN<br/>(`eks.amazonaws.com/role-arn`). Defaults to the value of `letsencrypt_enabled`.<br/>Set `false` if you manage the annotation yourself via `cert_manager_values`. | `bool` | `null` | no |
 | <a name="input_stage"></a> [stage](#input\_stage) | ID element. Usually used to indicate role, e.g. 'prod', 'staging', 'source', 'build', 'test', 'deploy', 'release' | `string` | `null` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Additional tags (e.g. `{'BusinessUnit': 'XYZ'}`).<br/>Neither the tag keys nor the tag values will be modified by this module. | `map(string)` | `{}` | no |
 | <a name="input_tenant"></a> [tenant](#input\_tenant) | ID element \_(Rarely used, not included by default)\_. A customer identifier, indicating who this instance of a resource is for | `string` | `null` | no |
@@ -202,9 +205,10 @@ Deployment after the annotation first lands.
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_cert_manager_issuer_metadata"></a> [cert\_manager\_issuer\_metadata](#output\_cert\_manager\_issuer\_metadata) | Block status of the deployed release |
 | <a name="output_cert_manager_metadata"></a> [cert\_manager\_metadata](#output\_cert\_manager\_metadata) | Block status of the deployed release |
+| <a name="output_service_account_role_arn"></a> [service\_account\_role\_arn](#output\_service\_account\_role\_arn) | ARN of the IAM role created for the cert-manager ServiceAccount when `letsencrypt_enabled` is `true`. Verify it matches the `eks.amazonaws.com/role-arn` annotation on the ServiceAccount. |
 <!-- markdownlint-restore -->
 
 
