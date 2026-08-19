@@ -79,6 +79,26 @@ variable "cert_manager_values" {
   default     = {}
 }
 
+variable "ingress_shim_default_issuer_name" {
+  type        = string
+  description = <<-EOT
+  Name of a ClusterIssuer (e.g. `letsencrypt-prod`) for ingress-shim to use as the cluster-wide default
+  when an annotated Ingress requests a certificate without naming an issuer. If `null` (the default),
+  no default issuer is configured and every Ingress must specify its issuer explicitly.
+  EOT
+  default     = null
+}
+
+variable "service_account_role_arn_annotation_enabled" {
+  type        = bool
+  description = <<-EOT
+  Whether the Helm release should annotate the cert-manager ServiceAccount with the IRSA IAM role ARN
+  (`eks.amazonaws.com/role-arn`). Defaults to the value of `letsencrypt_enabled`.
+  Set `false` if you manage the annotation yourself via `cert_manager_values`.
+  EOT
+  default     = null
+}
+
 ## cert_manager_issuer
 
 variable "cert_manager_issuer_description" {

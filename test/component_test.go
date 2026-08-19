@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/gruntwork-io/terratest/modules/random"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -57,7 +58,7 @@ func (s *ComponentSuite) TestBasic() {
 
 	atmos.OutputStruct(s.T(), options, "cert_manager_metadata", &metadataCertManager)
 
-	assert.Equal(s.T(), metadataCertManager.AppVersion, "v1.5.4")
+	assert.Equal(s.T(), metadataCertManager.AppVersion, "v1.21.1")
 	assert.Equal(s.T(), metadataCertManager.Chart, "cert-manager")
 	assert.NotNil(s.T(), metadataCertManager.FirstDeployed)
 	assert.NotNil(s.T(), metadataCertManager.LastDeployed)
@@ -66,7 +67,7 @@ func (s *ComponentSuite) TestBasic() {
 	assert.NotEmpty(s.T(), metadataCertManager.Notes)
 	assert.Equal(s.T(), metadataCertManager.Revision, 1)
 	assert.NotNil(s.T(), metadataCertManager.Values)
-	assert.Equal(s.T(), metadataCertManager.Version, "v1.5.4")
+	assert.Equal(s.T(), metadataCertManager.Version, "v1.21.1")
 
 
 	metadataCertManagerIssuer := helm.Metadata{}
@@ -82,7 +83,7 @@ func (s *ComponentSuite) TestBasic() {
 	assert.Empty(s.T(), metadataCertManagerIssuer.Notes)
 	assert.Equal(s.T(), metadataCertManagerIssuer.Revision, 1)
 	assert.NotNil(s.T(), metadataCertManagerIssuer.Values)
-	assert.Equal(s.T(), metadataCertManagerIssuer.Version, "0.1.0")
+	assert.Equal(s.T(), metadataCertManagerIssuer.Version, "0.2.0")
 
 
 	config, err := awsHelper.NewK8SClientConfig(cluster)
@@ -93,6 +94,11 @@ func (s *ComponentSuite) TestBasic() {
 	if err != nil {
 		panic(fmt.Errorf("failed to create dynamic client: %v", err))
 	}
+
+	// Registered after the destroy defer so it runs first: the namespace cannot terminate
+	// while ACME Orders/Challenges hold their finalizers, and only the cert-manager
+	// controller can clear them, so they have to drain before the release is uninstalled.
+	defer waitForACMEResourceCleanup(s.T(), dynamicClient, namespace)
 
 	verifyClusterIssuerStatus(s.T(), dynamicClient, "letsencrypt-prod")
 	verifyClusterIssuerStatus(s.T(), dynamicClient, "letsencrypt-staging")
@@ -177,6 +183,13 @@ func (s *ComponentSuite) TestBasic() {
 			assert.Fail(s.T(), msg)
 	}
 
+	// The basic fixture sets `ingress_shim_default_issuer_name: selfsigning-issuer`, so an
+	// annotated Ingress that names no issuer must resolve to that default. The fixture points
+	// at the self-signed ClusterIssuer rather than an ACME one on purpose: a shim-generated
+	// ACME certificate would open a DNS-01 Order that outlives the check and blocks the
+	// namespace from terminating during destroy.
+	verifyIngressShimDefaultIssuer(s.T(), dynamicClient, namespace, fmt.Sprintf("ingress-%s", randomID), fmt.Sprintf("shim.%s", domainName), "selfsigning-issuer")
+
 	s.DriftTest(component, stack, &inputs)
 }
 
@@ -210,6 +223,163 @@ func TestRunSuite(t *testing.T) {
 	helper.Run(t, suite)
 }
 
+
+// verifyIngressShimDefaultIssuer creates an Ingress annotated for TLS but without a
+// `cert-manager.io/cluster-issuer` annotation, and asserts that the Certificate
+// ingress-shim generates for it points at the chart's configured default issuer.
+func verifyIngressShimDefaultIssuer(t *testing.T, dynamicClient dynamic.Interface, namespace string, ingressName string, host string, issuerName string) {
+	ingressGVR := schema.GroupVersionResource{
+		Group:    "networking.k8s.io",
+		Version:  "v1",
+		Resource: "ingresses",
+	}
+	certGVR := schema.GroupVersionResource{
+		Group:    "cert-manager.io",
+		Version:  "v1",
+		Resource: "certificates",
+	}
+
+	// ingress-shim names the generated Certificate after the TLS secret.
+	certName := ingressName
+
+	ingress := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "networking.k8s.io/v1",
+			"kind":       "Ingress",
+			"metadata": map[string]interface{}{
+				"name":      ingressName,
+				"namespace": namespace,
+				"annotations": map[string]interface{}{
+					"kubernetes.io/tls-acme": "true",
+				},
+			},
+			"spec": map[string]interface{}{
+				"tls": []interface{}{
+					map[string]interface{}{
+						"hosts":      []interface{}{host},
+						"secretName": certName,
+					},
+				},
+				"rules": []interface{}{
+					map[string]interface{}{
+						"host": host,
+						"http": map[string]interface{}{
+							"paths": []interface{}{
+								map[string]interface{}{
+									"path":     "/",
+									"pathType": "Prefix",
+									"backend": map[string]interface{}{
+										"service": map[string]interface{}{
+											"name": "placeholder",
+											"port": map[string]interface{}{
+												"number": int64(80),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Deleting the Ingress garbage-collects the Certificate it owns, but garbage collection is
+	// asynchronous and races the Terraform destroy that follows. Delete the Certificate
+	// explicitly too so the namespace is empty of cert-manager resources by the time the Helm
+	// release goes away.
+	defer func() {
+		err := dynamicClient.Resource(ingressGVR).Namespace(namespace).Delete(context.Background(), ingressName, metav1.DeleteOptions{})
+		assert.NoError(t, err)
+
+		if err := dynamicClient.Resource(certGVR).Namespace(namespace).Delete(context.Background(), certName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			assert.NoError(t, err)
+		}
+	}()
+
+	_, err := dynamicClient.Resource(ingressGVR).Namespace(namespace).Create(context.Background(), ingress, metav1.CreateOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// ingress-shim reconciles the Ingress asynchronously, so poll for the Certificate.
+	const pollInterval = 5 * time.Second
+	const pollTimeout = 2 * time.Minute
+
+	ctx, cancel := context.WithTimeout(context.Background(), pollTimeout)
+	defer cancel()
+
+	for {
+		cert, getErr := dynamicClient.Resource(certGVR).Namespace(namespace).Get(ctx, certName, metav1.GetOptions{})
+		if getErr == nil && cert != nil {
+			name, found, nestedErr := unstructured.NestedString(cert.Object, "spec", "issuerRef", "name")
+			if nestedErr == nil && found {
+				assert.Equal(t, issuerName, name)
+				kind, _, _ := unstructured.NestedString(cert.Object, "spec", "issuerRef", "kind")
+				assert.Equal(t, "ClusterIssuer", kind)
+				return
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			assert.Fail(t, fmt.Sprintf("ingress-shim did not generate Certificate %q with a default issuerRef within %s (last Get error: %v)", certName, pollTimeout, getErr))
+			return
+		case <-time.After(pollInterval):
+		}
+	}
+}
+
+// waitForACMEResourceCleanup blocks until no cert-manager ACME Orders or Challenges remain
+// in the namespace. Both carry `finalizer.acme.cert-manager.io`, and only the cert-manager
+// controller can clear it — so any that survive the Helm uninstall leave the namespace stuck
+// in Terminating and `kubernetes_namespace` deletion fails with "context deadline exceeded"
+// after the provider's five-minute delete timeout. Draining them while the controller is
+// still running keeps the Terraform destroy deterministic.
+func waitForACMEResourceCleanup(t *testing.T, dynamicClient dynamic.Interface, namespace string) {
+	acmeGVRs := []schema.GroupVersionResource{
+		{Group: "acme.cert-manager.io", Version: "v1", Resource: "orders"},
+		{Group: "acme.cert-manager.io", Version: "v1", Resource: "challenges"},
+	}
+
+	const pollInterval = 5 * time.Second
+	const pollTimeout = 3 * time.Minute
+
+	ctx, cancel := context.WithTimeout(context.Background(), pollTimeout)
+	defer cancel()
+
+	for {
+		remaining := []string{}
+		for _, gvr := range acmeGVRs {
+			list, err := dynamicClient.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					// The CRD is already gone, so nothing of this kind can be left behind.
+					continue
+				}
+				// Anything else is inconclusive; keep polling rather than declaring the
+				// namespace clean.
+				remaining = append(remaining, fmt.Sprintf("%s (list error: %v)", gvr.Resource, err))
+				continue
+			}
+			for _, item := range list.Items {
+				remaining = append(remaining, fmt.Sprintf("%s/%s", gvr.Resource, item.GetName()))
+			}
+		}
+
+		if len(remaining) == 0 {
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			assert.Fail(t, fmt.Sprintf("cert-manager ACME resources still present in namespace %q after %s: %v; their finalizers will block the namespace from terminating once the Helm release is removed", namespace, pollTimeout, remaining))
+			return
+		case <-time.After(pollInterval):
+		}
+	}
+}
 
 func verifyClusterIssuerStatus(t *testing.T, dynamicClient dynamic.Interface, issuerName string) {
 	clusterIssuerGVR := schema.GroupVersionResource{
